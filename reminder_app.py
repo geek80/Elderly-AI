@@ -110,6 +110,50 @@ def safety_monitoring_summary():
         st.error(f"Error loading safety monitoring data: {e}")
 st.sidebar.title("Multi-Agent System")
 agent_choice = st.sidebar.radio("Choose an Agent", ["Reminder Agent", "Daily Health Summary", "Safety Monitoring"])
+import pandas as pd
+import schedule
+import time
+import streamlit as st
+from datetime import datetime
+
+# Load CSV once when the app starts
+@st.cache_data
+def load_reminders():
+    return pd.read_csv("daily_reminder.csv")
+
+# Function to run as a reminder
+def show_reminder(user, task):
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.success(f"🔔 Reminder for {user}: **{task}** at {current_time}")
+
+def run_reminder_agent():
+    st.header("⏰ Reminder Agent")
+
+    df = load_reminders()
+
+    # Clean and format
+    df['Time'] = df['Time'].str.strip()
+    scheduled = []
+
+    for _, row in df.iterrows():
+        user = row['Name']
+        task = row['Task']
+        time_str = row['Time']
+
+        # Schedule a task
+        try:
+            schedule.every().day.at(time_str).do(show_reminder, user=user, task=task)
+            scheduled.append(f"{user}: {task} at {time_str}")
+        except:
+            st.warning(f"Could not schedule task for {user} at {time_str}")
+
+    # Display scheduled tasks
+    if scheduled:
+        st.write("✅ The following tasks are scheduled today:")
+        for task in scheduled:
+            st.markdown(f"- {task}")
+    else:
+        st.warning("⚠️ No tasks scheduled. Check your CSV or time format.")
 
 if agent_choice == "Reminder Agent":
     run_reminder_agent()  # Your existing reminder code
