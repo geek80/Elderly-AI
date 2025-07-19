@@ -59,3 +59,52 @@ if uploaded_file:
 
 # In[ ]:
 
+def daily_health_summary():
+    st.header("🩺 Daily Health Summary Agent")
+    try:
+        df = pd.read_csv("health_monitoring.csv")
+
+        threshold_cols = [
+            'Heart Rate Below/Above Threshold (Yes/No)',
+            'Blood Pressure Below/Above Threshold (Yes/No)',
+            'Glucose Levels Below/Above Threshold (Yes/No)',
+            'SpO₂ Below Threshold (Yes/No)',
+            'Alert Triggered (Yes/No)',
+            'Caregiver Notified (Yes/No)'
+        ]
+
+        for col in threshold_cols:
+            df[col] = df[col].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
+
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+        df['Date'] = df['Timestamp'].dt.date
+
+        summary = df.groupby(['Device-ID/User-ID', 'Date'])[threshold_cols].sum().reset_index()
+
+        st.dataframe(summary)
+    except Exception as e:
+        st.error(f"Error loading health monitoring data: {e}")
+def safety_monitoring_summary():
+    st.header("🛡️ Safety Monitoring Agent")
+    try:
+        df = pd.read_csv("safety_monitoring.csv")
+
+        df = df.replace("-", pd.NA).dropna()
+
+        df['Fall Detected (Yes/No)'] = df['Fall Detected (Yes/No)'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
+        df['Alert Triggered (Yes/No)'] = df['Alert Triggered (Yes/No)'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
+        df['Caregiver Notified (Yes/No)'] = df['Caregiver Notified (Yes/No)'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
+
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+        df['Date'] = df['Timestamp'].dt.date
+
+        summary = df.groupby(['Device-ID/User-ID', 'Date'])[
+            ['Fall Detected (Yes/No)', 'Alert Triggered (Yes/No)', 'Caregiver Notified (Yes/No)']
+        ].sum().reset_index()
+
+        st.dataframe(summary)
+    except Exception as e:
+        st.error(f"Error loading safety monitoring data: {e}")
+st.sidebar.title("Multi-Agent System")
+agent_choice = st.sidebar.radio("Choose an Agent", ["Reminder Agent", "Daily Health Summary", "Safety Monitoring"])
+
