@@ -52,6 +52,10 @@ Assisted living homes
 
 Remote caregiving and monitoring by families or healthcare providers
 
+StreamLit App
+
+https://elderly-ai-fwkwmih84orn5vkj82ha7e.streamlit.app/
+
 
 🔒 Privacy Notice
 
