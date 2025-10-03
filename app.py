@@ -3,7 +3,6 @@
 
 # In[1]:
 
-
 import streamlit as st
 import sqlite3
 import pandas as pd
