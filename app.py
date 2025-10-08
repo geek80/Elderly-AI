@@ -3,11 +3,18 @@
 
 # In[1]:
 import streamlit as st
-import sqlite3
 import os
-db_path = "elderly_ai.db"  # Default
+from datetime import datetime
+import sqlite3
+
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
+db_path = "elderly_ai.db"
 if os.getenv("RENDER"):
-    db_path = "/app/elderly_ai.db"  # Render's persistent root
+    db_path = "/app/elderly_ai.db"
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)  # Ensure /app exists
 st.write(f"Using database at: {os.path.abspath(db_path)}")
 if not os.path.exists(db_path):
     st.write(f"Creating new DB at {db_path}")
@@ -24,8 +31,9 @@ if not os.path.exists(db_path):
         )
         """)
         conn.commit()
-conn = sqlite3.connect(db_path, isolation_level=None)  # Autocommit
+conn = sqlite3.connect(db_path, isolation_level=None)
 st.session_state.conn = conn
+# Rest of your code (forms, etc.)
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
