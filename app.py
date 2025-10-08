@@ -13,7 +13,7 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 db_path = "elderly_ai.db"
 if os.getenv("RENDER"):
-    db_path = "/app/elderly_ai.db"
+    db_path = "/tmp/elderly_ai.db"  # Temporary writable location
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)  # Ensure /app exists
 st.write(f"Using database at: {os.path.abspath(db_path)}")
 if not os.path.exists(db_path):
