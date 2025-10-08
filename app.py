@@ -2,6 +2,28 @@
 # coding: utf-8
 
 # In[1]:
+import os
+db_path = "elderly_ai.db"  # Default
+if os.getenv("RENDER"):
+    db_path = "/app/elderly_ai.db"  # Render's persistent root
+st.write(f"Using database at: {os.path.abspath(db_path)}")
+if not os.path.exists(db_path):
+    st.write(f"Creating new DB at {db_path}")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            timestamp TEXT,
+            reminder_type TEXT,
+            scheduled_time TEXT,
+            sent TEXT,
+            acknowledged TEXT
+        )
+        """)
+        conn.commit()
+conn = sqlite3.connect(db_path, isolation_level=None)  # Autocommit
+st.session_state.conn = conn
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
