@@ -2,7 +2,10 @@
 # coding: utf-8
 
 # In[1]:
-
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+import sqlite3  # Now uses pysqlite3
 import streamlit as st
 import sqlite3
 import pandas as pd
