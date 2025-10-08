@@ -10,6 +10,7 @@ import streamlit as st
 import os
 from datetime import datetime
 import pandas as pd
+import time
 
 # Senior-friendly styling (WCAG 2.1)
 st.markdown("""
@@ -25,62 +26,76 @@ st.markdown("""
 # Define database path with Render Persistent Disk
 db_path = "elderly_ai.db"
 if os.getenv("RENDER"):
-    db_path = "/data/elderly_ai.db"  # Match your Persistent Disk mount path
+    db_path = "/data/elderly_ai.db"  # Verified correct path
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)  # Ensure directory exists
 st.write(f"Using database at: {os.path.abspath(db_path)}")
 
-# Initialize or connect to database
+# Initialize or connect to database with retry
 if "conn" not in st.session_state:
-    if not os.path.exists(db_path):
-        st.write(f"Creating new DB at {db_path}")
+    max_retries = 5
+    for attempt in range(max_retries):
         try:
-            with sqlite3.connect(db_path) as conn:
-                conn.execute("""
-                CREATE TABLE IF NOT EXISTS reminders (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT,
-                    timestamp TEXT,
-                    reminder_type TEXT,
-                    scheduled_time TEXT,
-                    sent TEXT,
-                    acknowledged TEXT
-                )
-                """)
-                conn.execute("""
-                CREATE TABLE IF NOT EXISTS health (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT,
-                    timestamp TEXT,
-                    heart_rate INTEGER,
-                    hr_alert TEXT,
-                    bp TEXT,
-                    bp_alert TEXT,
-                    glucose INTEGER,
-                    glucose_alert TEXT,
-                    spo2 INTEGER,
-                    spo2_alert TEXT,
-                    alert_triggered TEXT,
-                    caregiver_notified TEXT
-                )
-                """)
-                conn.execute("""
-                CREATE TABLE IF NOT EXISTS safety (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT,
-                    timestamp TEXT,
-                    movement TEXT,
-                    fall_detected TEXT,
-                    impact_force TEXT,
-                    inactivity_duration INTEGER,
-                    location TEXT,
-                    alert_triggered TEXT,
-                    caregiver_notified TEXT
-                )
-                """)
-                conn.commit()
+            if not os.path.exists(db_path):
+                st.write(f"Creating new DB at {db_path} (Attempt {attempt + 1}/{max_retries})")
+                with sqlite3.connect(db_path) as conn:
+                    conn.execute("""
+                    CREATE TABLE IF NOT EXISTS reminders (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        timestamp TEXT,
+                        reminder_type TEXT,
+                        scheduled_time TEXT,
+                        sent TEXT,
+                        acknowledged TEXT
+                    )
+                    """)
+                    conn.execute("""
+                    CREATE TABLE IF NOT EXISTS health (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        timestamp TEXT,
+                        heart_rate INTEGER,
+                        hr_alert TEXT,
+                        bp TEXT,
+                        bp_alert TEXT,
+                        glucose INTEGER,
+                        glucose_alert TEXT,
+                        spo2 INTEGER,
+                        spo2_alert TEXT,
+                        alert_triggered TEXT,
+                        caregiver_notified TEXT
+                    )
+                    """)
+                    conn.execute("""
+                    CREATE TABLE IF NOT EXISTS safety (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        timestamp TEXT,
+                        movement TEXT,
+                        fall_detected TEXT,
+                        impact_force TEXT,
+                        inactivity_duration INTEGER,
+                        location TEXT,
+                        alert_triggered TEXT,
+                        caregiver_notified TEXT
+                    )
+                    """)
+                    conn.commit()
+            st.session_state.conn = sqlite3.connect(db_path, isolation_level=None)  # Autocommit
+            st.success("Database connection established!")
+            break
+        except sqlite3.OperationalError as e:
+            if "unable to open database file" in str(e):
+                st.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in 2 seconds...")
+                time.sleep(2)
+            else:
+                st.error(f"DB Error: {str(e)}")
+                break
         except Exception as e:
-            st.error(f"DB creation failed: {str(e)}")
-    st.session_state.conn = sqlite3.connect(db_path, isolation_level=None)  # Autocommit
+            st.error(f"Unexpected error: {str(e)}")
+            break
+    else:
+        st.error(f"Failed to connect to database after {max_retries} attempts.")
 conn = st.session_state.conn
 
 # Tabs for each agent
