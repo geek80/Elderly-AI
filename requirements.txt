@@ -1,4 +1,4 @@
 streamlit
 pandas
 cryptography
-pysqlite3-binary==0.5.3  # Latest compatible
+pysqlite3-binary==0.5.4
