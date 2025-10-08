@@ -3,6 +3,7 @@
 
 # In[1]:
 import streamlit as st
+import sqlite3
 import os
 db_path = "elderly_ai.db"  # Default
 if os.getenv("RENDER"):
