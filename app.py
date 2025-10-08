@@ -35,52 +35,6 @@ if "conn" not in st.session_state:
     max_retries = 5
     for attempt in range(max_retries):
         try:
-            if not os.path.exists(db_path):
-                st.write(f"Creating new DB at {db_path} (Attempt {attempt + 1}/{max_retries})")
-                with sqlite3.connect(db_path) as conn:
-                    conn.execute("""
-                    CREATE TABLE IF NOT EXISTS reminders (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT,
-                        timestamp TEXT,
-                        reminder_type TEXT,
-                        scheduled_time TEXT,
-                        sent TEXT,
-                        acknowledged TEXT
-                    )
-                    """)
-                    conn.execute("""
-                    CREATE TABLE IF NOT EXISTS health (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT,
-                        timestamp TEXT,
-                        heart_rate INTEGER,
-                        hr_alert TEXT,
-                        bp TEXT,
-                        bp_alert TEXT,
-                        glucose INTEGER,
-                        glucose_alert TEXT,
-                        spo2 INTEGER,
-                        spo2_alert TEXT,
-                        alert_triggered TEXT,
-                        caregiver_notified TEXT
-                    )
-                    """)
-                    conn.execute("""
-                    CREATE TABLE IF NOT EXISTS safety (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT,
-                        timestamp TEXT,
-                        movement TEXT,
-                        fall_detected TEXT,
-                        impact_force TEXT,
-                        inactivity_duration INTEGER,
-                        location TEXT,
-                        alert_triggered TEXT,
-                        caregiver_notified TEXT
-                    )
-                    """)
-                    conn.commit()
             st.session_state.conn = sqlite3.connect(db_path, isolation_level=None)  # Autocommit
             st.success("Database connection established!")
             break
@@ -90,21 +44,63 @@ if "conn" not in st.session_state:
                 time.sleep(2)
             else:
                 st.error(f"DB Error: {str(e)}")
-                st.session_state.conn = None  # Fallback to None
                 break
         except Exception as e:
             st.error(f"Unexpected error: {str(e)}")
-            st.session_state.conn = None  # Fallback to None
             break
     else:
         st.error(f"Failed to connect to database after {max_retries} attempts.")
-        st.session_state.conn = None  # Fallback to None
-
-# Check if connection is valid, fallback to in-memory if failed
-if st.session_state.conn is None:
-    st.error("Using in-memory database as fallback due to connection failure.")
-    st.session_state.conn = sqlite3.connect(":memory:", isolation_level=None)
+        st.session_state.conn = sqlite3.connect(":memory:", isolation_level=None)  # Fallback
 conn = st.session_state.conn
+
+# Create tables if they don't exist
+try:
+    with conn:
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            timestamp TEXT,
+            reminder_type TEXT,
+            scheduled_time TEXT,
+            sent TEXT,
+            acknowledged TEXT
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS health (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            timestamp TEXT,
+            heart_rate INTEGER,
+            hr_alert TEXT,
+            bp TEXT,
+            bp_alert TEXT,
+            glucose INTEGER,
+            glucose_alert TEXT,
+            spo2 INTEGER,
+            spo2_alert TEXT,
+            alert_triggered TEXT,
+            caregiver_notified TEXT
+        )
+        """)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS safety (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            timestamp TEXT,
+            movement TEXT,
+            fall_detected TEXT,
+            impact_force TEXT,
+            inactivity_duration INTEGER,
+            location TEXT,
+            alert_triggered TEXT,
+            caregiver_notified TEXT
+        )
+        """)
+    st.success("Database tables initialized or verified.")
+except Exception as e:
+    st.error(f"Failed to create tables: {str(e)}")
 
 # Tabs for each agent
 tab1, tab2, tab3 = st.tabs(["Reminders", "Health", "Safety"])
