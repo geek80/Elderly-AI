@@ -26,11 +26,12 @@ st.markdown("""
 # Define database path with Render Persistent Disk
 db_path = "elderly_ai.db"
 if os.getenv("RENDER"):
-    db_path = "/data/elderly_ai.db"  # Verified correct path
-    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)  # Ensure directory exists
+    db_base_path = "/data"  # Base mount path from Render Dashboard
+    db_path = os.path.join(db_base_path, "elderly_ai.db")  # Full path
+    os.makedirs(db_base_path, exist_ok=True)  # Ensure directory exists
 st.write(f"Using database at: {os.path.abspath(db_path)}")
 
-# Initialize or connect to database with retry (for initial setup)
+# Initialize or connect to database with retry
 if "conn" not in st.session_state:
     max_retries = 5
     for attempt in range(max_retries):
@@ -113,7 +114,6 @@ with tab1:
         submitted = st.form_submit_button("Add")
         if submitted:
             try:
-                # Create a new connection for this operation
                 with sqlite3.connect(db_path, isolation_level=None) as new_conn:
                     cursor = new_conn.execute("""
                     INSERT INTO reminders (user_id, timestamp, reminder_type, scheduled_time, sent, acknowledged)
@@ -127,7 +127,6 @@ with tab1:
 
     st.subheader("Recent Reminders")
     try:
-        # Create a new connection for this query
         with sqlite3.connect(db_path, isolation_level=None) as new_conn:
             cursor = new_conn.execute("SELECT * FROM reminders ORDER BY id DESC LIMIT 5")
             st.write(cursor.fetchall())
@@ -147,7 +146,6 @@ with tab2:
         submitted = st.form_submit_button("Save")
         if submitted:
             try:
-                # Create a new connection for this operation
                 with sqlite3.connect(db_path, isolation_level=None) as new_conn:
                     hr_alert = "Yes" if hr < 60 or hr > 100 else "No"
                     bp_alert = "Yes" if bp_sys > 140 or bp_dia > 90 else "No"
@@ -168,7 +166,6 @@ with tab2:
 
     st.subheader("Recent Vitals")
     try:
-        # Create a new connection for this query
         with sqlite3.connect(db_path, isolation_level=None) as new_conn:
             cursor = new_conn.execute("SELECT * FROM health ORDER BY id DESC LIMIT 5")
             st.write(cursor.fetchall())
@@ -188,7 +185,6 @@ with tab3:
         submitted = st.form_submit_button("Save")
         if submitted:
             try:
-                # Create a new connection for this operation
                 with sqlite3.connect(db_path, isolation_level=None) as new_conn:
                     alert_triggered = "Yes" if fall_detected == "Yes" and inactivity_duration > 90 else "No"
                     caregiver_notified = "Yes" if alert_triggered == "Yes" else "No"
@@ -204,7 +200,6 @@ with tab3:
 
     st.subheader("Recent Safety Events")
     try:
-        # Create a new connection for this query
         with sqlite3.connect(db_path, isolation_level=None) as new_conn:
             cursor = new_conn.execute("SELECT * FROM safety ORDER BY id DESC LIMIT 5")
             st.write(cursor.fetchall())
