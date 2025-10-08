@@ -25,57 +25,61 @@ st.markdown("""
 # Define database path with Render Persistent Disk
 db_path = "elderly_ai.db"
 if os.getenv("RENDER"):
-    db_path = "/data/elderly_ai.db"  # Match Persistent Disk mount path
+    db_path = "/data/elderly_ai.db"  # Match your Persistent Disk mount path
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)  # Ensure directory exists
 st.write(f"Using database at: {os.path.abspath(db_path)}")
 
 # Initialize or connect to database
 if "conn" not in st.session_state:
     if not os.path.exists(db_path):
         st.write(f"Creating new DB at {db_path}")
-        with sqlite3.connect(db_path) as conn:
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS reminders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                timestamp TEXT,
-                reminder_type TEXT,
-                scheduled_time TEXT,
-                sent TEXT,
-                acknowledged TEXT
-            )
-            """)
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS health (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                timestamp TEXT,
-                heart_rate INTEGER,
-                hr_alert TEXT,
-                bp TEXT,
-                bp_alert TEXT,
-                glucose INTEGER,
-                glucose_alert TEXT,
-                spo2 INTEGER,
-                spo2_alert TEXT,
-                alert_triggered TEXT,
-                caregiver_notified TEXT
-            )
-            """)
-            conn.execute("""
-            CREATE TABLE IF NOT EXISTS safety (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT,
-                timestamp TEXT,
-                movement TEXT,
-                fall_detected TEXT,
-                impact_force TEXT,
-                inactivity_duration INTEGER,
-                location TEXT,
-                alert_triggered TEXT,
-                caregiver_notified TEXT
-            )
-            """)
-            conn.commit()
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    timestamp TEXT,
+                    reminder_type TEXT,
+                    scheduled_time TEXT,
+                    sent TEXT,
+                    acknowledged TEXT
+                )
+                """)
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS health (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    timestamp TEXT,
+                    heart_rate INTEGER,
+                    hr_alert TEXT,
+                    bp TEXT,
+                    bp_alert TEXT,
+                    glucose INTEGER,
+                    glucose_alert TEXT,
+                    spo2 INTEGER,
+                    spo2_alert TEXT,
+                    alert_triggered TEXT,
+                    caregiver_notified TEXT
+                )
+                """)
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS safety (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    timestamp TEXT,
+                    movement TEXT,
+                    fall_detected TEXT,
+                    impact_force TEXT,
+                    inactivity_duration INTEGER,
+                    location TEXT,
+                    alert_triggered TEXT,
+                    caregiver_notified TEXT
+                )
+                """)
+                conn.commit()
+        except Exception as e:
+            st.error(f"DB creation failed: {str(e)}")
     st.session_state.conn = sqlite3.connect(db_path, isolation_level=None)  # Autocommit
 conn = st.session_state.conn
 
@@ -132,7 +136,7 @@ with tab2:
                       f"{bp_sys}/{bp_dia} mmHg", bp_alert, glucose, glucose_alert, spo2, spo2_alert,
                       alert_triggered, caregiver_notified))
                 conn.commit()
-                st.success("Vitals saved! Rows affected: {cursor.rowcount}")
+                st.success(f"Vitals saved! Rows affected: {cursor.rowcount}")
             except Exception as e:
                 st.error(f"DB Error: {str(e)}")
 
@@ -161,13 +165,10 @@ with tab3:
                 """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), movement, fall_detected,
                       impact_force, inactivity_duration, location, alert_triggered, caregiver_notified))
                 conn.commit()
-                st.success("Safety event logged! Rows affected: {cursor.rowcount}")
+                st.success(f"Safety event logged! Rows affected: {cursor.rowcount}")
             except Exception as e:
                 st.error(f"DB Error: {str(e)}")
 
     st.subheader("Recent Safety Events")
     cursor = conn.execute("SELECT * FROM safety ORDER BY id DESC LIMIT 5")
     st.write(cursor.fetchall())
-
-# Close connection on app shutdown (optional, handled by session state)
-# conn.close()  # Uncomment if needed, but session state manages this
