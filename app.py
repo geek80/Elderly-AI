@@ -90,12 +90,20 @@ if "conn" not in st.session_state:
                 time.sleep(2)
             else:
                 st.error(f"DB Error: {str(e)}")
+                st.session_state.conn = None  # Fallback to None
                 break
         except Exception as e:
             st.error(f"Unexpected error: {str(e)}")
+            st.session_state.conn = None  # Fallback to None
             break
     else:
         st.error(f"Failed to connect to database after {max_retries} attempts.")
+        st.session_state.conn = None  # Fallback to None
+
+# Check if connection is valid, fallback to in-memory if failed
+if st.session_state.conn is None:
+    st.error("Using in-memory database as fallback due to connection failure.")
+    st.session_state.conn = sqlite3.connect(":memory:", isolation_level=None)
 conn = st.session_state.conn
 
 # Tabs for each agent
