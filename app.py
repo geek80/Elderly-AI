@@ -26,19 +26,24 @@ st.markdown("""
 # Define database path with Render Persistent Disk
 db_path = "elderly_ai.db"
 if os.getenv("RENDER"):
-    db_base_path = "/data"  # Base mount path from Render Dashboard
-    db_path = os.path.join(db_base_path, "elderly_ai.db")  # Full path
+    db_base_path = "/data/db"  # Updated mount path per Render support
+    db_path = os.path.join(db_base_path, "elderly_ai.db")
     os.makedirs(db_base_path, exist_ok=True)  # Ensure directory exists
+    # Create or touch the file to ensure it exists
+    try:
+        with open(db_path, 'a'):
+            os.utime(db_path, None)
+        st.write(f"Verified write access to {db_path}")
+    except Exception as e:
+        st.error(f"Permission test failed: {str(e)}")
 st.write(f"Using database at: {os.path.abspath(db_path)}")
 
-# Initialize or connect to database with retry
-if "conn" not in st.session_state:
+# Function to get connection (thread-safe)
+def get_connection():
     max_retries = 5
     for attempt in range(max_retries):
         try:
-            st.session_state.conn = sqlite3.connect(db_path, isolation_level=None)  # Initial connection
-            st.success("Database connection established!")
-            break
+            return sqlite3.connect(db_path, isolation_level=None)
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
                 st.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in 2 seconds...")
@@ -46,16 +51,16 @@ if "conn" not in st.session_state:
             else:
                 st.error(f"DB Error: {str(e)}")
                 break
-        except Exception as e:
-            st.error(f"Unexpected error: {str(e)}")
-            break
-    else:
-        st.error(f"Failed to connect to database after {max_retries} attempts.")
-        st.session_state.conn = sqlite3.connect(":memory:", isolation_level=None)  # Fallback
-    # Create tables if they don't exist
+    return None
+
+# Create tables
+def create_tables():
+    conn = get_connection()
+    if conn is None:
+        return False
     try:
-        with st.session_state.conn:
-            st.session_state.conn.execute("""
+        with conn:
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS reminders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -66,7 +71,7 @@ if "conn" not in st.session_state:
                 acknowledged TEXT
             )
             """)
-            st.session_state.conn.execute("""
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS health (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -83,7 +88,7 @@ if "conn" not in st.session_state:
                 caregiver_notified TEXT
             )
             """)
-            st.session_state.conn.execute("""
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS safety (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -97,9 +102,14 @@ if "conn" not in st.session_state:
                 caregiver_notified TEXT
             )
             """)
-        st.success("Database tables initialized or verified.")
+        st.success("Tables created or verified.")
+        return True
     except Exception as e:
-        st.error(f"Failed to create tables: {str(e)}")
+        st.error(f"Table creation failed: {str(e)}")
+        return False
+
+# Create tables on startup
+create_tables()
 
 # Tabs for each agent
 tab1, tab2, tab3 = st.tabs(["Reminders", "Health", "Safety"])
@@ -113,95 +123,42 @@ with tab1:
         scheduled_time = st.time_input("Scheduled Time")
         submitted = st.form_submit_button("Add")
         if submitted:
-            try:
-                with sqlite3.connect(db_path, isolation_level=None) as new_conn:
-                    cursor = new_conn.execute("""
+            conn = get_connection()
+            if conn is None:
+                st.error("Cannot connect to database.")
+            else:
+                try:
+                    cursor = conn.execute("""
                     INSERT INTO reminders (user_id, timestamp, reminder_type, scheduled_time, sent, acknowledged)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), reminder_type,
                           scheduled_time.strftime("%H:%M:%S"), "No", "No"))
-                    new_conn.commit()
+                    conn.commit()
                     st.success(f"Reminder for {reminder_type} added! Rows affected: {cursor.rowcount}")
-            except Exception as e:
-                st.error(f"DB Error: {str(e)}")
+                except Exception as e:
+                    st.error(f"DB Error: {str(e)}")
+                finally:
+                    conn.close()
 
     st.subheader("Recent Reminders")
-    try:
-        with sqlite3.connect(db_path, isolation_level=None) as new_conn:
-            cursor = new_conn.execute("SELECT * FROM reminders ORDER BY id DESC LIMIT 5")
+    conn = get_connection()
+    if conn is None:
+        st.error("Cannot connect to database.")
+    else:
+        try:
+            cursor = conn.execute("SELECT * FROM reminders ORDER BY id DESC LIMIT 5")
             st.write(cursor.fetchall())
-    except Exception as e:
-        st.error(f"DB Error: {str(e)}")
+        except Exception as e:
+            st.error(f"DB Error: {str(e)}")
+        finally:
+            conn.close()
 
-# Health Summary Agent Form
+# Health Summary Agent Form (simplified)
 with tab2:
     st.header("Log Vitals")
-    with st.form("health_form"):
-        user_id = st.text_input("User ID", "U1000")
-        hr = st.number_input("Heart Rate (bpm)", min_value=0, max_value=200)
-        bp_sys = st.number_input("Systolic BP (mmHg)", min_value=0)
-        bp_dia = st.number_input("Diastolic BP (mmHg)", min_value=0)
-        glucose = st.number_input("Glucose (mg/dL)", min_value=0)
-        spo2 = st.number_input("SpO2 (%)", min_value=0, max_value=100)
-        submitted = st.form_submit_button("Save")
-        if submitted:
-            try:
-                with sqlite3.connect(db_path, isolation_level=None) as new_conn:
-                    hr_alert = "Yes" if hr < 60 or hr > 100 else "No"
-                    bp_alert = "Yes" if bp_sys > 140 or bp_dia > 90 else "No"
-                    glucose_alert = "Yes" if glucose < 70 or glucose > 140 else "No"
-                    spo2_alert = "Yes" if spo2 < 90 else "No"
-                    alert_triggered = "Yes" if any([hr_alert == "Yes", bp_alert == "Yes", glucose_alert == "Yes", spo2_alert == "Yes"]) else "No"
-                    caregiver_notified = "Yes" if alert_triggered == "Yes" else "No"
-                    cursor = new_conn.execute("""
-                    INSERT INTO health (user_id, timestamp, heart_rate, hr_alert, bp, bp_alert, glucose, glucose_alert, spo2, spo2_alert, alert_triggered, caregiver_notified)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), hr, hr_alert,
-                          f"{bp_sys}/{bp_dia} mmHg", bp_alert, glucose, glucose_alert, spo2, spo2_alert,
-                          alert_triggered, caregiver_notified))
-                    new_conn.commit()
-                    st.success(f"Vitals saved! Rows affected: {cursor.rowcount}")
-            except Exception as e:
-                st.error(f"DB Error: {str(e)}")
+    st.write("Vitals form placeholder.")
 
-    st.subheader("Recent Vitals")
-    try:
-        with sqlite3.connect(db_path, isolation_level=None) as new_conn:
-            cursor = new_conn.execute("SELECT * FROM health ORDER BY id DESC LIMIT 5")
-            st.write(cursor.fetchall())
-    except Exception as e:
-        st.error(f"DB Error: {str(e)}")
-
-# Safety Monitoring Agent Form
+# Safety Monitoring Agent Form (simplified)
 with tab3:
     st.header("Log Safety Event")
-    with st.form("safety_form"):
-        user_id = st.text_input("User ID", "U1000")
-        movement = st.selectbox("Movement", ["Walking", "Sitting", "Lying", "No Movement"])
-        fall_detected = st.selectbox("Fall Detected", ["No", "Yes"])
-        impact_force = st.selectbox("Impact Force", ["-", "Low", "Medium", "High"]) if fall_detected == "Yes" else "-"
-        inactivity_duration = st.number_input("Inactivity Duration (seconds)", min_value=0) if fall_detected == "Yes" else 0
-        location = st.selectbox("Location", ["Kitchen", "Bedroom", "Bathroom", "Living Room"])
-        submitted = st.form_submit_button("Save")
-        if submitted:
-            try:
-                with sqlite3.connect(db_path, isolation_level=None) as new_conn:
-                    alert_triggered = "Yes" if fall_detected == "Yes" and inactivity_duration > 90 else "No"
-                    caregiver_notified = "Yes" if alert_triggered == "Yes" else "No"
-                    cursor = new_conn.execute("""
-                    INSERT INTO safety (user_id, timestamp, movement, fall_detected, impact_force, inactivity_duration, location, alert_triggered, caregiver_notified)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), movement, fall_detected,
-                          impact_force, inactivity_duration, location, alert_triggered, caregiver_notified))
-                    new_conn.commit()
-                    st.success(f"Safety event logged! Rows affected: {cursor.rowcount}")
-            except Exception as e:
-                st.error(f"DB Error: {str(e)}")
-
-    st.subheader("Recent Safety Events")
-    try:
-        with sqlite3.connect(db_path, isolation_level=None) as new_conn:
-            cursor = new_conn.execute("SELECT * FROM safety ORDER BY id DESC LIMIT 5")
-            st.write(cursor.fetchall())
-    except Exception as e:
-        st.error(f"DB Error: {str(e)}")
+    st.write("Safety form placeholder.")
