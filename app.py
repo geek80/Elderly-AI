@@ -40,7 +40,6 @@ if os.getenv("RENDER"):
         logging.info(f"Verified write access to {db_path}")
     except Exception as e:
         logging.error(f"Permission test failed: {str(e)}")
-# Remove st.write for path (debug only)
 
 # Function to get connection (thread-safe)
 def get_connection():
@@ -144,19 +143,6 @@ with tab1:
                 finally:
                     conn.close()
 
-    st.subheader("Recent Reminders")
-    conn = get_connection()
-    if conn is None:
-        st.error("Cannot connect to database.")
-    else:
-        try:
-            cursor = conn.execute("SELECT * FROM reminders ORDER BY id DESC LIMIT 5")
-            st.write(cursor.fetchall())
-        except Exception as e:
-            st.error(f"DB Error: {str(e)}")
-        finally:
-            conn.close()
-
     # Reminder Notification (adjusted for near-time alerts)
     if "last_check" not in st.session_state:
         st.session_state.last_check = time.time()
@@ -224,7 +210,12 @@ with tab2:
     else:
         try:
             cursor = conn.execute("SELECT * FROM health ORDER BY id DESC LIMIT 5")
-            st.write(cursor.fetchall())
+            vitals = cursor.fetchall()
+            if vitals:
+                df = pd.DataFrame(vitals, columns=["ID", "User ID", "Timestamp", "Heart Rate", "HR Alert", "BP", "BP Alert", "Glucose", "Glucose Alert", "SpO2", "SpO2 Alert", "Alert Triggered", "Caregiver Notified"])
+                st.table(df)
+            else:
+                st.write("No vitals logged yet.")
         except Exception as e:
             st.error(f"DB Error: {str(e)}")
         finally:
@@ -268,7 +259,12 @@ with tab3:
     else:
         try:
             cursor = conn.execute("SELECT * FROM safety ORDER BY id DESC LIMIT 5")
-            st.write(cursor.fetchall())
+            events = cursor.fetchall()
+            if events:
+                df = pd.DataFrame(events, columns=["ID", "User ID", "Timestamp", "Movement", "Fall Detected", "Impact Force", "Inactivity Duration", "Location", "Alert Triggered", "Caregiver Notified"])
+                st.table(df)
+            else:
+                st.write("No safety events logged yet.")
         except Exception as e:
             st.error(f"DB Error: {str(e)}")
         finally:
