@@ -113,7 +113,31 @@ create_tables()
 
 # Tabs for each agent
 tab1, tab2, tab3 = st.tabs(["Reminders", "Health", "Safety"])
+import time
 
+if "last_check" not in st.session_state:
+    st.session_state.last_check = time.time()
+
+current_time = datetime.now().strftime("%H:%M:%S")
+conn = get_connection()
+if conn:
+    try:
+        cursor = conn.execute("SELECT * FROM reminders WHERE sent='No'")
+        reminders = cursor.fetchall()
+        for reminder in reminders:
+            scheduled_time = datetime.strptime(reminder[4], "%H:%M:%S").time()
+            current_dt = datetime.now().time()
+            if abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds()) <= 60:
+                st.success(f"Reminder Alert: {reminder[3]} at {reminder[4]} for {reminder[1]}!")
+                conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+                conn.commit()
+    except Exception as e:
+        st.error(f"Reminder check failed: {str(e)}")
+    finally:
+        conn.close()
+
+if time.time() - st.session_state.last_check > 60:  # Update every minute
+    st.session_state.last_check = time.time()
 # Reminder Agent Form
 with tab1:
     st.header("Add Reminder")
@@ -153,12 +177,95 @@ with tab1:
         finally:
             conn.close()
 
-# Health Summary Agent Form (simplified)
+# Health Summary Agent Form
 with tab2:
     st.header("Log Vitals")
-    st.write("Vitals form placeholder.")
+    with st.form("health_form"):
+        user_id = st.text_input("User ID", "U1000")
+        hr = st.number_input("Heart Rate (bpm)", min_value=0, max_value=200)
+        bp_sys = st.number_input("Systolic BP (mmHg)", min_value=0)
+        bp_dia = st.number_input("Diastolic BP (mmHg)", min_value=0)
+        glucose = st.number_input("Glucose (mg/dL)", min_value=0)
+        spo2 = st.number_input("SpO2 (%)", min_value=0, max_value=100)
+        submitted = st.form_submit_button("Save")
+        if submitted:
+            conn = get_connection()
+            if conn is None:
+                st.error("Cannot connect to database.")
+            else:
+                try:
+                    hr_alert = "Yes" if hr < 60 or hr > 100 else "No"
+                    bp_alert = "Yes" if bp_sys > 140 or bp_dia > 90 else "No"
+                    glucose_alert = "Yes" if glucose < 70 or glucose > 140 else "No"
+                    spo2_alert = "Yes" if spo2 < 90 else "No"
+                    alert_triggered = "Yes" if any([hr_alert == "Yes", bp_alert == "Yes", glucose_alert == "Yes", spo2_alert == "Yes"]) else "No"
+                    caregiver_notified = "Yes" if alert_triggered == "Yes" else "No"
+                    cursor = conn.execute("""
+                    INSERT INTO health (user_id, timestamp, heart_rate, hr_alert, bp, bp_alert, glucose, glucose_alert, spo2, spo2_alert, alert_triggered, caregiver_notified)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), hr, hr_alert,
+                          f"{bp_sys}/{bp_dia} mmHg", bp_alert, glucose, glucose_alert, spo2, spo2_alert,
+                          alert_triggered, caregiver_notified))
+                    conn.commit()
+                    st.success(f"Vitals saved! Rows affected: {cursor.rowcount}")
+                except Exception as e:
+                    st.error(f"DB Error: {str(e)}")
+                finally:
+                    conn.close()
 
-# Safety Monitoring Agent Form (simplified)
+    st.subheader("Recent Vitals")
+    conn = get_connection()
+    if conn is None:
+        st.error("Cannot connect to database.")
+    else:
+        try:
+            cursor = conn.execute("SELECT * FROM health ORDER BY id DESC LIMIT 5")
+            st.write(cursor.fetchall())
+        except Exception as e:
+            st.error(f"DB Error: {str(e)}")
+        finally:
+            conn.close()
+
+# Safety Monitoring Agent Form
 with tab3:
     st.header("Log Safety Event")
-    st.write("Safety form placeholder.")
+    with st.form("safety_form"):
+        user_id = st.text_input("User ID", "U1000")
+        movement = st.selectbox("Movement", ["Walking", "Sitting", "Lying", "No Movement"])
+        fall_detected = st.selectbox("Fall Detected", ["No", "Yes"])
+        impact_force = st.selectbox("Impact Force", ["-", "Low", "Medium", "High"]) if fall_detected == "Yes" else "-"
+        inactivity_duration = st.number_input("Inactivity Duration (seconds)", min_value=0) if fall_detected == "Yes" else 0
+        location = st.selectbox("Location", ["Kitchen", "Bedroom", "Bathroom", "Living Room"])
+        submitted = st.form_submit_button("Save")
+        if submitted:
+            conn = get_connection()
+            if conn is None:
+                st.error("Cannot connect to database.")
+            else:
+                try:
+                    alert_triggered = "Yes" if fall_detected == "Yes" and inactivity_duration > 90 else "No"
+                    caregiver_notified = "Yes" if alert_triggered == "Yes" else "No"
+                    cursor = conn.execute("""
+                    INSERT INTO safety (user_id, timestamp, movement, fall_detected, impact_force, inactivity_duration, location, alert_triggered, caregiver_notified)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), movement, fall_detected,
+                          impact_force, inactivity_duration, location, alert_triggered, caregiver_notified))
+                    conn.commit()
+                    st.success(f"Safety event logged! Rows affected: {cursor.rowcount}")
+                except Exception as e:
+                    st.error(f"DB Error: {str(e)}")
+                finally:
+                    conn.close()
+
+    st.subheader("Recent Safety Events")
+    conn = get_connection()
+    if conn is None:
+        st.error("Cannot connect to database.")
+    else:
+        try:
+            cursor = conn.execute("SELECT * FROM safety ORDER BY id DESC LIMIT 5")
+            st.write(cursor.fetchall())
+        except Exception as e:
+            st.error(f"DB Error: {str(e)}")
+        finally:
+            conn.close()
