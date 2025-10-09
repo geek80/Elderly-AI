@@ -138,7 +138,7 @@ with tab1:
                     """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), reminder_type,
                           scheduled_time.strftime("%H:%M:%S"), "No", "No"))
                     conn.commit()
-                    st.success(f"Reminder for {reminder_type} added! Rows affected: {cursor.rowcount}")
+                    st.success(f"Reminder for {reminder_type} added!")
                 except Exception as e:
                     st.error(f"DB Error: {str(e)}")
                 finally:
@@ -198,7 +198,7 @@ with tab2:
                           f"{bp_sys}/{bp_dia} mmHg", bp_alert, glucose, glucose_alert, spo2, spo2_alert,
                           alert_triggered, caregiver_notified))
                     conn.commit()
-                    st.success(f"Vitals saved! Rows affected: {cursor.rowcount}")
+                    st.success(f"Vitals saved!")
                 except Exception as e:
                     st.error(f"DB Error: {str(e)}")
                 finally:
@@ -229,7 +229,7 @@ with tab3:
                     """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), movement, fall_detected,
                           impact_force, inactivity_duration, location, alert_triggered, caregiver_notified))
                     conn.commit()
-                    st.success(f"Safety event logged! Rows affected: {cursor.rowcount}")
+                    st.success(f"Safety event logged!")
                 except Exception as e:
                     st.error(f"DB Error: {str(e)}")
                 finally:
