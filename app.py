@@ -2,6 +2,7 @@
 # coding: utf-8
 
 # Import required libraries
+import logging
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
@@ -11,6 +12,9 @@ import os
 from datetime import datetime
 import pandas as pd
 import time
+
+# Set up logging (to file, not UI)
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # Senior-friendly styling (WCAG 2.1)
 st.markdown("""
@@ -29,14 +33,14 @@ if os.getenv("RENDER"):
     db_base_path = "/data/db"  # Updated mount path per Render support
     db_path = os.path.join(db_base_path, "elderly_ai.db")
     os.makedirs(db_base_path, exist_ok=True)  # Ensure directory exists
-    # Create or touch the file to ensure it exists
+    # Create or touch the file to ensure it exists (log only)
     try:
         with open(db_path, 'a'):
             os.utime(db_path, None)
-        st.write(f"Verified write access to {db_path}")
+        logging.info(f"Verified write access to {db_path}")
     except Exception as e:
-        st.error(f"Permission test failed: {str(e)}")
-st.write(f"Using database at: {os.path.abspath(db_path)}")
+        logging.error(f"Permission test failed: {str(e)}")
+# Remove st.write for path (debug only)
 
 # Function to get connection (thread-safe)
 def get_connection():
@@ -46,10 +50,10 @@ def get_connection():
             return sqlite3.connect(db_path, isolation_level=None)
         except sqlite3.OperationalError as e:
             if "unable to open database file" in str(e):
-                st.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in 2 seconds...")
+                logging.warning(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}. Retrying in 2 seconds...")
                 time.sleep(2)
             else:
-                st.error(f"DB Error: {str(e)}")
+                logging.error(f"DB Error: {str(e)}")
                 break
     return None
 
@@ -102,10 +106,10 @@ def create_tables():
                 caregiver_notified TEXT
             )
             """)
-        st.success("Tables created or verified.")
+        logging.info("Tables created or verified.")
         return True
     except Exception as e:
-        st.error(f"Table creation failed: {str(e)}")
+        logging.error(f"Table creation failed: {str(e)}")
         return False
 
 # Create tables on startup
@@ -113,31 +117,7 @@ create_tables()
 
 # Tabs for each agent
 tab1, tab2, tab3 = st.tabs(["Reminders", "Health", "Safety"])
-import time
 
-if "last_check" not in st.session_state:
-    st.session_state.last_check = time.time()
-
-current_time = datetime.now().strftime("%H:%M:%S")
-conn = get_connection()
-if conn:
-    try:
-        cursor = conn.execute("SELECT * FROM reminders WHERE sent='No'")
-        reminders = cursor.fetchall()
-        for reminder in reminders:
-            scheduled_time = datetime.strptime(reminder[4], "%H:%M:%S").time()
-            current_dt = datetime.now().time()
-            if abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds()) <= 60:
-                st.success(f"Reminder Alert: {reminder[3]} at {reminder[4]} for {reminder[1]}!")
-                conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
-                conn.commit()
-    except Exception as e:
-        st.error(f"Reminder check failed: {str(e)}")
-    finally:
-        conn.close()
-
-if time.time() - st.session_state.last_check > 60:  # Update every minute
-    st.session_state.last_check = time.time()
 # Reminder Agent Form
 with tab1:
     st.header("Add Reminder")
@@ -176,6 +156,30 @@ with tab1:
             st.error(f"DB Error: {str(e)}")
         finally:
             conn.close()
+
+    # Reminder Notification (adjusted for near-time alerts)
+    if "last_check" not in st.session_state:
+        st.session_state.last_check = time.time()
+    current_time = datetime.now().strftime("%H:%M:%S")
+    conn = get_connection()
+    if conn:
+        try:
+            cursor = conn.execute("SELECT * FROM reminders WHERE sent='No'")
+            reminders = cursor.fetchall()
+            for reminder in reminders:
+                scheduled_time = datetime.strptime(reminder[4], "%H:%M:%S").time()
+                current_dt = datetime.now().time()
+                time_diff = abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds())
+                if time_diff <= 60:  # Alert within 1 minute
+                    st.success(f"Reminder Alert: {reminder[3]} at {reminder[4]} for {reminder[1]}!")
+                    conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+                    conn.commit()
+        except Exception as e:
+            st.error(f"Reminder check failed: {str(e)}")
+        finally:
+            conn.close()
+    if time.time() - st.session_state.last_check > 60:
+        st.session_state.last_check = time.time()
 
 # Health Summary Agent Form
 with tab2:
