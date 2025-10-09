@@ -27,19 +27,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Define database path with Render Persistent Disk
-db_path = "elderly_ai.db"
+# Define database path with Render vs. local logic
 if os.getenv("RENDER"):
-    db_base_path = "/data/db"  # Updated mount path per Render support
-    db_path = os.path.join(db_base_path, "elderly_ai.db")
-    os.makedirs(db_base_path, exist_ok=True)  # Ensure directory exists
-    # Create or touch the file to ensure it exists (log only)
-    try:
-        with open(db_path, 'a'):
-            os.utime(db_path, None)
-        logging.info(f"Verified write access to {db_path}")
-    except Exception as e:
-        logging.error(f"Permission test failed: {str(e)}")
+    db_base_path = "/data/db"  # Render Persistent Disk
+else:
+    db_base_path = "."  # Local directory (current working directory)
+db_path = os.path.join(db_base_path, "elderly_ai.db")
+os.makedirs(db_base_path, exist_ok=True)  # Ensure directory exists
+# Create or touch the file to ensure it exists (log only)
+try:
+    with open(db_path, 'a'):
+        os.utime(db_path, None)
+    logging.info(f"Verified write access to {db_path}")
+except Exception as e:
+    logging.error(f"Permission test failed: {str(e)}")
 
 # Function to get connection (thread-safe)
 def get_connection():
