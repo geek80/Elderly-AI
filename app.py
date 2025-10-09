@@ -203,24 +203,6 @@ with tab2:
                 finally:
                     conn.close()
 
-    st.subheader("Recent Vitals")
-    conn = get_connection()
-    if conn is None:
-        st.error("Cannot connect to database.")
-    else:
-        try:
-            cursor = conn.execute("SELECT * FROM health ORDER BY id DESC LIMIT 5")
-            vitals = cursor.fetchall()
-            if vitals:
-                df = pd.DataFrame(vitals, columns=["ID", "User ID", "Timestamp", "Heart Rate", "HR Alert", "BP", "BP Alert", "Glucose", "Glucose Alert", "SpO2", "SpO2 Alert", "Alert Triggered", "Caregiver Notified"])
-                st.table(df)
-            else:
-                st.write("No vitals logged yet.")
-        except Exception as e:
-            st.error(f"DB Error: {str(e)}")
-        finally:
-            conn.close()
-
 # Safety Monitoring Agent Form
 with tab3:
     st.header("Log Safety Event")
@@ -251,21 +233,3 @@ with tab3:
                     st.error(f"DB Error: {str(e)}")
                 finally:
                     conn.close()
-
-    st.subheader("Recent Safety Events")
-    conn = get_connection()
-    if conn is None:
-        st.error("Cannot connect to database.")
-    else:
-        try:
-            cursor = conn.execute("SELECT * FROM safety ORDER BY id DESC LIMIT 5")
-            events = cursor.fetchall()
-            if events:
-                df = pd.DataFrame(events, columns=["ID", "User ID", "Timestamp", "Movement", "Fall Detected", "Impact Force", "Inactivity Duration", "Location", "Alert Triggered", "Caregiver Notified"])
-                st.table(df)
-            else:
-                st.write("No safety events logged yet.")
-        except Exception as e:
-            st.error(f"DB Error: {str(e)}")
-        finally:
-            conn.close()
