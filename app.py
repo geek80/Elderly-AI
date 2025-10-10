@@ -121,43 +121,62 @@ def create_tables():
 
 # Create tables on startup
 create_tables()
+
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+import logging
+import os
+from datetime import datetime
+
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
 def send_reminder_email(user_id, email, reminder_type, scheduled_time):
     if not email:
-        logging.warning("No email for user_id: {user_id}")
+        logging.warning(f"No email for user_id: {user_id}")
         return False
+    # Convert scheduled_time to string if it's a datetime.time object
+    scheduled_time_str = scheduled_time.strftime("%H:%M:%S") if hasattr(scheduled_time, 'strftime') else scheduled_time
     message = Mail(
-        from_email='noreply@elderlyai.io',  # Verified sender (set up in SendGrid)
+        from_email='noreply@elderlyai.io',  # Replace with verified sender
         to_emails=email,
-        subject=f'Reminder: {reminder_type} at {scheduled_time}',
-        plain_text_content=f'Hi! Your {reminder_type} reminder is due at {scheduled_time}. Stay safe!'
+        subject=f'Reminder: {reminder_type} at {scheduled_time_str}',
+        plain_text_content=f'Hi! Your {reminder_type} reminder is due at {scheduled_time_str}. Stay safe!'
     )
     try:
         sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
         response = sg.send(message)
-        logging.info(f"Email sent to {email} for {reminder_type}")
-        return True
+        logging.info(f"Email sent to {email} for {reminder_type}, Status: {response.status_code}")
+        if response.status_code == 202:
+            return True
+        else:
+            logging.error(f"SendGrid returned status {response.status_code}")
+            return False
     except Exception as e:
-        logging.error(f"Email error: {str(e)}")
+        logging.error(f"Email error for {user_id}: {str(e)}")
         return False
 
-# Check and send reminders on load
+# Example usage in your reminder check (adjust to your logic)
 current_time = datetime.now().strftime("%H:%M:%S")
 conn = get_connection()
 if conn:
     try:
-        cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No' AND r.scheduled_time <= ?", (current_time,))
-        due_reminders = cursor.fetchall()
-        for reminder in due_reminders:
-            if send_reminder_email(reminder[1], reminder[2], reminder[3], reminder[4]):
-                conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+        cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
+        reminders = cursor.fetchall()
+        for reminder in reminders:
+            scheduled_time = datetime.strptime(reminder[4], "%H:%M:%S").time()
+            current_dt = datetime.now().time()
+            time_diff = abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds())
+            if time_diff <= 60:  # Within 1 minute
+                user_id, email, reminder_type, scheduled_time_str = reminder[1], reminder[2], reminder[3], reminder[4]
+                if send_reminder_email(user_id, email, reminder_type, scheduled_time_str):
+                    conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
         conn.commit()
     except Exception as e:
-        st.error(f"Reminder send failed: {str(e)}")
+        st.error(f"Reminder check failed: {str(e)}")
     finally:
         conn.close()
+        
 # Registration sidebar
 with st.sidebar:
     st.header("Register for Reminders")
