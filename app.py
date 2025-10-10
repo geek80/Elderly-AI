@@ -121,6 +121,43 @@ def create_tables():
 
 # Create tables on startup
 create_tables()
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
+def send_reminder_email(user_id, email, reminder_type, scheduled_time):
+    if not email:
+        logging.warning("No email for user_id: {user_id}")
+        return False
+    message = Mail(
+        from_email='noreply@elderlyai.io',  # Verified sender (set up in SendGrid)
+        to_emails=email,
+        subject=f'Reminder: {reminder_type} at {scheduled_time}',
+        plain_text_content=f'Hi! Your {reminder_type} reminder is due at {scheduled_time}. Stay safe!'
+    )
+    try:
+        sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
+        response = sg.send(message)
+        logging.info(f"Email sent to {email} for {reminder_type}")
+        return True
+    except Exception as e:
+        logging.error(f"Email error: {str(e)}")
+        return False
+
+# Check and send reminders on load
+current_time = datetime.now().strftime("%H:%M:%S")
+conn = get_connection()
+if conn:
+    try:
+        cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No' AND r.scheduled_time <= ?", (current_time,))
+        due_reminders = cursor.fetchall()
+        for reminder in due_reminders:
+            if send_reminder_email(reminder[1], reminder[2], reminder[3], reminder[4]):
+                conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+        conn.commit()
+    except Exception as e:
+        st.error(f"Reminder send failed: {str(e)}")
+    finally:
+        conn.close()
 # Registration sidebar
 with st.sidebar:
     st.header("Register for Reminders")
