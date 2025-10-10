@@ -65,6 +65,13 @@ def create_tables():
     try:
         with conn:
             conn.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT UNIQUE,
+        email TEXT
+    )
+    """)
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS reminders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -114,7 +121,24 @@ def create_tables():
 
 # Create tables on startup
 create_tables()
-
+# Registration sidebar
+with st.sidebar:
+    st.header("Register for Reminders")
+    with st.form("register_form"):
+        email = st.text_input("Email")
+        user_id = st.text_input("User ID", "U1000")
+        submitted = st.form_submit_button("Register")
+        if submitted:
+            conn = get_connection()
+            if conn:
+                try:
+                    conn.execute("INSERT OR REPLACE INTO users (user_id, email) VALUES (?, ?)", (user_id, email))
+                    conn.commit()
+                    st.success("Registered! You'll get reminders at this email.")
+                except Exception as e:
+                    st.error(f"Registration Error: {str(e)}")
+                finally:
+                    conn.close()
 # Tabs for each agent
 tab1, tab2, tab3 = st.tabs(["Reminders", "Health", "Safety"])
 
