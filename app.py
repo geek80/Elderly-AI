@@ -224,23 +224,22 @@ with tab1:
                 finally:
                     conn.close()
 
-    # Reminder Notification (adjusted for near-time alerts)
-    if "last_check" not in st.session_state:
-        st.session_state.last_check = time.time()
+    # Check and send reminders on page load
     current_time = datetime.now().strftime("%H:%M:%S")
     conn = get_connection()
     if conn:
         try:
-            cursor = conn.execute("SELECT * FROM reminders WHERE sent='No'")
+            cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
             reminders = cursor.fetchall()
             for reminder in reminders:
                 scheduled_time = datetime.strptime(reminder[4], "%H:%M:%S").time()
                 current_dt = datetime.now().time()
                 time_diff = abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds())
-                if time_diff <= 60:  # Alert within 1 minute
-                    st.success(f"Reminder Alert: {reminder[3]} at {reminder[4]} for {reminder[1]}!")
-                    conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
-                    conn.commit()
+                if time_diff <= 60:  # Within 1 minute
+                    user_id, email, reminder_type, scheduled_time_str = reminder[1], reminder[2], reminder[3], reminder[4]
+                    if send_reminder_email(user_id, email, reminder_type, scheduled_time_str):
+                        conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+            conn.commit()
         except Exception as e:
             st.error(f"Reminder check failed: {str(e)}")
         finally:
