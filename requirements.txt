@@ -4,4 +4,5 @@ schedule
 pandas
 cryptography
 pysqlite3-binary==0.5.4
+sendgrid
 
