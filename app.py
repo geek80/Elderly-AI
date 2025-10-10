@@ -244,8 +244,7 @@ with tab1:
             st.error(f"Reminder check failed: {str(e)}")
         finally:
             conn.close()
-    if time.time() - st.session_state.last_check > 60:
-        st.session_state.last_check = time.time()
+    
 
 # Health Summary Agent Form
 with tab2:
