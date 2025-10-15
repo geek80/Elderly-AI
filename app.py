@@ -230,7 +230,7 @@ if conn:
             current_dt = datetime.now()
             time_diff = abs((scheduled_time - current_dt).total_seconds())
             logging.info(f"Checking reminder ID {reminder[0]}, time_diff: {time_diff}")
-            if time_diff <= 60:
+            if time_diff <= 300:
                 user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
                 logging.info(f"Triggering email for {reminder_type}")
                 if send_reminder_email(user_id, email, reminder_type, scheduled_time):
