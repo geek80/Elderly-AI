@@ -211,26 +211,34 @@ with tab1:
 
     # Debug reminder check (temporary, remove after testing)
     current_time = datetime.now().strftime("%H:%M:%S")
-    conn = get_connection()
-    if conn:
-        try:
-            cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
-            reminders = cursor.fetchall()
-            logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
-            for reminder in reminders:
-                scheduled_time = datetime.strptime(reminder[4], "%Y-%m-%d %H:%M:%S").time()
-                current_dt = datetime.now().time()
-                time_diff = abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds())
-                logging.info(f"Checking reminder ID {reminder[0]}, time_diff: {time_diff}")
-                if time_diff <= 60:
-                    user_id, email, reminder_type, scheduled_time_str = reminder[1], reminder[2], reminder[3], reminder[4]
-                    logging.info(f"Triggering email for {reminder_type}")
-                    if send_reminder_email(user_id, email, reminder_type, scheduled_time_str):
-                        conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
-        except Exception as e:
-            logging.error(f"Reminder check failed: {str(e)}")
-        finally:
-            conn.close()
+conn = get_connection()
+if conn:
+    try:
+        cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
+        reminders = cursor.fetchall()
+        logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
+        for reminder in reminders:
+            scheduled_time_str = reminder[4]
+            try:
+                # Try full datetime first
+                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                # Fall back to time-only (assume today)
+                scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
+                    year=datetime.now().year, month=datetime.now().month, day=datetime.now().day
+                )
+            current_dt = datetime.now()
+            time_diff = abs((scheduled_time - current_dt).total_seconds())
+            logging.info(f"Checking reminder ID {reminder[0]}, time_diff: {time_diff}")
+            if time_diff <= 60:
+                user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
+                logging.info(f"Triggering email for {reminder_type}")
+                if send_reminder_email(user_id, email, reminder_type, scheduled_time):
+                    conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+    except Exception as e:
+        logging.error(f"Reminder check failed: {str(e)}")
+    finally:
+        conn.close()
 
 # Health Summary Agent Form
 with tab2:
