@@ -124,6 +124,9 @@ def create_tables():
 create_tables()
 
 # Email function (moved to top level for cron use)
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
 def send_reminder_email(user_id, email, reminder_type, scheduled_time):
     if not email:
         logging.warning(f"No email for user_id: {user_id}")
@@ -172,21 +175,27 @@ with tab1:
     with st.form("reminder_form"):
         user_id = st.text_input("User ID", "U1000")
         reminder_type = st.selectbox("Reminder Type", ["Exercise", "Hydration", "Appointment", "Medication"])
-        scheduled_time = st.datetime_input("Scheduled Time", min_value=datetime.now())
-        submitted = st.form_submit_button("Add")
+        scheduled_date = st.date_input("Scheduled Date", min_value=datetime.now().date())
+        scheduled_time = st.time_input("Scheduled Time")
+        submitted = st.form_submit_button("Add")  # Add submit button
         if submitted:
             conn = get_connection()
             if conn is None:
                 st.error("Cannot connect to database.")
             else:
                 try:
-                    cursor = conn.execute("""
-                    INSERT INTO reminders (user_id, timestamp, reminder_type, scheduled_time, sent, acknowledged)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), reminder_type,
-                          scheduled_time.strftime("%Y-%m-%d %H:%M:%S"), "No", "No"))
-                    conn.commit()
-                    st.success(f"Reminder for {reminder_type} added for {scheduled_time.strftime('%Y-%m-%d %H:%M')}!")
+                    full_scheduled_time = datetime.combine(scheduled_date, scheduled_time).strftime("%Y-%m-%d %H:%M:%S")
+                    current_time = datetime.now()
+                    if datetime.strptime(full_scheduled_time, "%Y-%m-%d %H:%M:%S") <= current_time:
+                        st.error("Please select a future date and time.")
+                    else:
+                        cursor = conn.execute("""
+                        INSERT INTO reminders (user_id, timestamp, reminder_type, scheduled_time, sent, acknowledged)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """, (user_id, datetime.now().strftime("%m/%d/%Y %H:%M"), reminder_type,
+                              full_scheduled_time, "No", "No"))
+                        conn.commit()
+                        st.success(f"Reminder for {reminder_type} added for {full_scheduled_time}!")
                 except sqlite3.IntegrityError:
                     st.error("Duplicate reminder detected—use a different time.")
                 except Exception as e:
@@ -207,7 +216,7 @@ with tab2:
         bp_dia = st.number_input("Diastolic BP (mmHg)", min_value=0)
         glucose = st.number_input("Glucose (mg/dL)", min_value=0)
         spo2 = st.number_input("SpO2 (%)", min_value=0, max_value=100)
-        submitted = st.form_submit_button("Save")
+        submitted = st.form_submit_button("Save")  # Add submit button
         if submitted:
             conn = get_connection()
             if conn is None:
@@ -243,7 +252,7 @@ with tab3:
         impact_force = st.selectbox("Impact Force", ["-", "Low", "Medium", "High"]) if fall_detected == "Yes" else "-"
         inactivity_duration = st.number_input("Inactivity Duration (seconds)", min_value=0) if fall_detected == "Yes" else 0
         location = st.selectbox("Location", ["Kitchen", "Bedroom", "Bathroom", "Living Room"])
-        submitted = st.form_submit_button("Save")
+        submitted = st.form_submit_button("Save")  # Add submit button
         if submitted:
             conn = get_connection()
             if conn is None:
