@@ -82,8 +82,9 @@ def create_tables():
                 acknowledged TEXT
             )
             """)
-            # Only add unique index if it doesn't exist
-            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_reminder ON reminders (user_id, scheduled_time);")
+            # Drop and recreate index to avoid conflicts
+            conn.execute("DROP INDEX IF EXISTS idx_unique_reminder")
+            conn.execute("CREATE UNIQUE INDEX idx_unique_reminder ON reminders (user_id, scheduled_time);")
             conn.execute("""
             CREATE TABLE IF NOT EXISTS health (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,7 +121,6 @@ def create_tables():
     except Exception as e:
         logging.error(f"Table creation failed: {str(e)}")
         return False
-
 # Create tables on startup
 create_tables()
 
