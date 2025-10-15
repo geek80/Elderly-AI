@@ -82,6 +82,7 @@ def create_tables():
                 acknowledged TEXT
             )
             """)
+            # Only add unique index if it doesn't exist
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_reminder ON reminders (user_id, scheduled_time);")
             conn.execute("""
             CREATE TABLE IF NOT EXISTS health (
@@ -128,6 +129,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 def send_reminder_email(user_id, email, reminder_type, scheduled_time):
+    logging.info(f"Attempting to send to {email} for {reminder_type} (user_id: {user_id})")
     if not email:
         logging.warning(f"No email for user_id: {user_id}")
         return False
@@ -140,6 +142,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
     )
     try:
         sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
+        logging.info(f"API Key loaded: {os.getenv('SENDGRID_API_KEY')[:10]}..." if os.getenv('SENDGRID_API_KEY') else "API Key missing!")
         response = sg.send(message)
         logging.info(f"Email sent to {email} for {reminder_type}, Status: {response.status_code}")
         return response.status_code == 202
@@ -203,8 +206,31 @@ with tab1:
                 finally:
                     conn.close()
 
-    # Remove time-based check from page load (handled by cron)
+    # Informational note (cron handles sending)
     st.write("Reminders are checked and sent via a scheduled job.")
+
+    # Debug reminder check (temporary, remove after testing)
+    current_time = datetime.now().strftime("%H:%M:%S")
+    conn = get_connection()
+    if conn:
+        try:
+            cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
+            reminders = cursor.fetchall()
+            logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
+            for reminder in reminders:
+                scheduled_time = datetime.strptime(reminder[4], "%Y-%m-%d %H:%M:%S").time()
+                current_dt = datetime.now().time()
+                time_diff = abs((datetime.combine(datetime.today(), scheduled_time) - datetime.combine(datetime.today(), current_dt)).total_seconds())
+                logging.info(f"Checking reminder ID {reminder[0]}, time_diff: {time_diff}")
+                if time_diff <= 60:
+                    user_id, email, reminder_type, scheduled_time_str = reminder[1], reminder[2], reminder[3], reminder[4]
+                    logging.info(f"Triggering email for {reminder_type}")
+                    if send_reminder_email(user_id, email, reminder_type, scheduled_time_str):
+                        conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+        except Exception as e:
+            logging.error(f"Reminder check failed: {str(e)}")
+        finally:
+            conn.close()
 
 # Health Summary Agent Form
 with tab2:
