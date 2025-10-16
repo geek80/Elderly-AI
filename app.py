@@ -210,7 +210,7 @@ with tab1:
     st.write("Reminders are checked and sent via a scheduled job.")
 
     # Debug reminder check (temporary, remove after testing)
-    current_time = datetime.now().strftime("%H:%M:%S")
+    current_time = datetime.now()
 conn = get_connection()
 if conn:
     try:
@@ -218,19 +218,10 @@ if conn:
         reminders = cursor.fetchall()
         logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
         for reminder in reminders:
-            scheduled_time_str = reminder[4]
-            try:
-                # Try full datetime first
-                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                # Fall back to time-only (assume today)
-                scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
-                    year=datetime.now().year, month=datetime.now().month, day=datetime.now().day
-                )
-            current_dt = datetime.now()
-            time_diff = abs((scheduled_time - current_dt).total_seconds())
+            scheduled_time = datetime.strptime(reminder[4], "%Y-%m-%d %H:%M:%S")
+            time_diff = (scheduled_time - current_time).total_seconds()
             logging.info(f"Checking reminder ID {reminder[0]}, time_diff: {time_diff}")
-            if time_diff <= 300:
+            if 0 <= time_diff <= 300:  # Within 5 minutes from now
                 user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
                 logging.info(f"Triggering email for {reminder_type}")
                 if send_reminder_email(user_id, email, reminder_type, scheduled_time):
