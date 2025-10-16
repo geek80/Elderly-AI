@@ -153,7 +153,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
         return False
 
 # Global reminder check
-current_time = datetime.now(pytz.timezone('Europe/Berlin'))  # Adjusts to CET (UTC+1) or CEST based on DST
+current_time = datetime.now(pytz.timezone('Etc/GMT+1'))  # Fixed UTC+1, no DST
 logging.info(f"Current time with timezone: {current_time} ({current_time.tzname()})")
 conn = get_connection()
 if conn:
@@ -164,16 +164,16 @@ if conn:
         for reminder in reminders:
             scheduled_time_str = reminder[4].replace('+00:53', '').strip()  # Remove +00:53 and trim
             try:
-                # Parse as naive datetime and apply local time zone
+                # Parse as naive datetime and apply UTC+1 time zone
                 scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S").replace(
-                    tzinfo=pytz.timezone('Europe/Berlin')
+                    tzinfo=pytz.timezone('Etc/GMT+1')
                 )
             except ValueError:
                 try:
-                    # Handle time-only format, apply current date and local time zone
+                    # Handle time-only format, apply current date and UTC+1 time zone
                     scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
                         year=current_time.year, month=current_time.month, day=current_time.day,
-                        tzinfo=pytz.timezone('Europe/Berlin')
+                        tzinfo=pytz.timezone('Etc/GMT+1')
                     )
                 except ValueError:
                     logging.error(f"Invalid scheduled_time format for ID {reminder[0]}: {scheduled_time_str}")
