@@ -153,7 +153,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
         return False
 
 # Global reminder check
-current_time = datetime.now(pytz.timezone('Europe/Berlin'))  # Use CET/CEST based on local rules
+current_time = datetime.now(pytz.timezone('Europe/Berlin'))  # Adjusts to CET (UTC+1) or CEST based on DST
 logging.info(f"Current time with timezone: {current_time} ({current_time.tzname()})")
 conn = get_connection()
 if conn:
@@ -162,7 +162,7 @@ if conn:
         reminders = cursor.fetchall()
         logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
         for reminder in reminders:
-            scheduled_time_str = reminder[4].split('+')[0].strip()  # Remove +00:09 and trim
+            scheduled_time_str = reminder[4].replace('+00:53', '').strip()  # Remove +00:53 and trim
             try:
                 # Parse as naive datetime and apply local time zone
                 scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S").replace(
