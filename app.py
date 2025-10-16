@@ -151,7 +151,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
         return False
 
 # Global reminder check
-current_time = datetime.now()
+logging.info(f"Current time with timezone: {current_time} ({time.tzname[0]})")
 conn = get_connection()
 if conn:
     try:
