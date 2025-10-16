@@ -120,6 +120,7 @@ def create_tables():
     except Exception as e:
         logging.error(f"Table creation failed: {str(e)}")
         return False
+
 # Create tables on startup
 create_tables()
 
@@ -148,6 +149,38 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
     except Exception as e:
         logging.error(f"Email error for {user_id}: {str(e)}")
         return False
+
+# Global reminder check
+current_time = datetime.now()
+conn = get_connection()
+if conn:
+    try:
+        cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
+        reminders = cursor.fetchall()
+        logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
+        for reminder in reminders:
+            scheduled_time_str = reminder[4]
+            try:
+                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                try:
+                    scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
+                        year=current_time.year, month=current_time.month, day=current_time.day
+                    )
+                except ValueError:
+                    logging.error(f"Invalid scheduled_time format for ID {reminder[0]}: {scheduled_time_str}")
+                    continue
+            time_diff = (scheduled_time - current_time).total_seconds()
+            logging.info(f"Checking reminder ID {reminder[0]}, scheduled: {scheduled_time}, time_diff: {time_diff}")
+            if -300 <= time_diff <= 300:  # 5-minute window before/after
+                user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
+                logging.info(f"Triggering email for {reminder_type}")
+                if send_reminder_email(user_id, email, reminder_type, scheduled_time):
+                    conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
+    except Exception as e:
+        logging.error(f"Reminder check failed: {str(e)}")
+    finally:
+        conn.close()
 
 # Registration sidebar
 with st.sidebar:
@@ -207,8 +240,6 @@ with tab1:
 
     # Informational note (cron handles sending)
     st.write("Reminders are checked and sent via a scheduled job.")
-
-    
 
 # Health Summary Agent Form
 with tab2:
