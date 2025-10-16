@@ -153,7 +153,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
         return False
 
 # Global reminder check
-current_time = datetime.now(pytz.timezone('Europe/Paris'))
+current_time = datetime.now(pytz.timezone('Europe/Berlin'))  # Use CET/CEST based on local rules
 logging.info(f"Current time with timezone: {current_time} ({current_time.tzname()})")
 conn = get_connection()
 if conn:
@@ -162,25 +162,25 @@ if conn:
         reminders = cursor.fetchall()
         logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
         for reminder in reminders:
-            scheduled_time_str = reminder[4].replace('+00:09', '').strip()  # Remove +00:09 and trim
+            scheduled_time_str = reminder[4].split('+')[0].strip()  # Remove +00:09 and trim
             try:
-                # Parse as naive datetime and apply CEST time zone
+                # Parse as naive datetime and apply local time zone
                 scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S").replace(
-                    tzinfo=pytz.timezone('Europe/Paris')
+                    tzinfo=pytz.timezone('Europe/Berlin')
                 )
             except ValueError:
                 try:
-                    # Handle time-only format, apply current date and CEST
+                    # Handle time-only format, apply current date and local time zone
                     scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
                         year=current_time.year, month=current_time.month, day=current_time.day,
-                        tzinfo=pytz.timezone('Europe/Paris')
+                        tzinfo=pytz.timezone('Europe/Berlin')
                     )
                 except ValueError:
                     logging.error(f"Invalid scheduled_time format for ID {reminder[0]}: {scheduled_time_str}")
                     continue
             time_diff = (scheduled_time - current_time).total_seconds()
             logging.info(f"Checking reminder ID {reminder[0]}, scheduled: {scheduled_time}, time_diff: {time_diff}")
-            if -60 <= time_diff <= 60:  # 1-minute window before/after
+            if -300 <= time_diff <= 300:  # 5-minute window before/after
                 user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
                 logging.info(f"Triggering email for {reminder_type}")
                 if send_reminder_email(user_id, email, reminder_type, scheduled_time):
