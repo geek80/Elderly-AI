@@ -154,9 +154,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
 
 # Global reminder check
 current_time = datetime.now(pytz.timezone('Europe/Paris'))
-
-
-logging.info(f"Current time with timezone: {current_time} ({time.tzname[0]})")
+logging.info(f"Current time with timezone: {current_time} ({current_time.tzname()})")
 conn = get_connection()
 if conn:
     try:
@@ -166,18 +164,23 @@ if conn:
         for reminder in reminders:
             scheduled_time_str = reminder[4]
             try:
-                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
+                # Parse as naive datetime and apply CEST time zone
+                scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S").replace(
+                    tzinfo=pytz.timezone('Europe/Paris')
+                )
             except ValueError:
                 try:
+                    # Handle time-only format, apply current date and CEST
                     scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
-                        year=current_time.year, month=current_time.month, day=current_time.day
+                        year=current_time.year, month=current_time.month, day=current_time.day,
+                        tzinfo=pytz.timezone('Europe/Paris')
                     )
                 except ValueError:
                     logging.error(f"Invalid scheduled_time format for ID {reminder[0]}: {scheduled_time_str}")
                     continue
             time_diff = (scheduled_time - current_time).total_seconds()
             logging.info(f"Checking reminder ID {reminder[0]}, scheduled: {scheduled_time}, time_diff: {time_diff}")
-            if -900 <= time_diff <= 900:  # 5-minute window before/after
+            if -60 <= time_diff <= 60:  # 1-minute window before/after
                 user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
                 logging.info(f"Triggering email for {reminder_type}")
                 if send_reminder_email(user_id, email, reminder_type, scheduled_time):
@@ -186,7 +189,6 @@ if conn:
         logging.error(f"Reminder check failed: {str(e)}")
     finally:
         conn.close()
-
 # Registration sidebar
 with st.sidebar:
     st.header("Register for Reminders")
