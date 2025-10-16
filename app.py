@@ -209,26 +209,14 @@ with tab1:
     st.write("Reminders are checked and sent via a scheduled job.")
 
     # Debug reminder check (temporary, remove after testing)
-    current_time = datetime.now()
-conn = get_connection()
-if conn:
-    try:
-        cursor = conn.execute("SELECT r.id, r.user_id, u.email, r.reminder_type, r.scheduled_time FROM reminders r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.sent='No'")
-        reminders = cursor.fetchall()
-        logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
-        for reminder in reminders:
-            scheduled_time = datetime.strptime(reminder[4], "%Y-%m-%d %H:%M:%S")
-            time_diff = (scheduled_time - current_time).total_seconds()
-            logging.info(f"Checking reminder ID {reminder[0]}, time_diff: {time_diff}")
-            if 0 <= time_diff <= 300:  # Within 5 minutes from now
-                user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
-                logging.info(f"Triggering email for {reminder_type}")
-                if send_reminder_email(user_id, email, reminder_type, scheduled_time):
-                    conn.execute("UPDATE reminders SET sent='Yes' WHERE id=?", (reminder[0],))
-    except Exception as e:
-        logging.error(f"Reminder check failed: {str(e)}")
-    finally:
-        conn.close()
+    2025-10-16 12:06:29,178 - Verified write access to /data/db/elderly_ai.db
+2025-10-16 12:06:29,186 - Tables created or verified.
+2025-10-16 12:06:29,283 - Found 18 unsent reminders at 2025-10-16 12:06:29.279924
+2025-10-16 12:06:29,284 - Reminder check failed: time data '23:45:00' does not match format '%Y-%m-%d %H:%M:%S'
+2025-10-16 12:06:46,248 - Verified write access to /data/db/elderly_ai.db
+2025-10-16 12:06:46,264 - Tables created or verified.
+2025-10-16 12:06:46,277 - Found 19 unsent reminders at 2025-10-16 12:06:46.277692
+2025-10-16 12:06:46,278 - Reminder check failed: time data '23:45:00' does not match format '%Y-%m-%d %H:%M:%S
 
 # Health Summary Agent Form
 with tab2:
