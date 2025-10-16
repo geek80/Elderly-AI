@@ -82,7 +82,6 @@ def create_tables():
                 acknowledged TEXT
             )
             """)
-            # Drop and recreate index to avoid conflicts
             conn.execute("DROP INDEX IF EXISTS idx_unique_reminder")
             conn.execute("CREATE UNIQUE INDEX idx_unique_reminder ON reminders (user_id, scheduled_time);")
             conn.execute("""
