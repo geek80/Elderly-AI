@@ -162,7 +162,7 @@ if conn:
         reminders = cursor.fetchall()
         logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
         for reminder in reminders:
-            scheduled_time_str = reminder[4].split('+')[0]  # Remove the +00:09 suffix
+            scheduled_time_str = reminder[4].replace('+00:09', '').strip()  # Remove +00:09 and trim
             try:
                 # Parse as naive datetime and apply CEST time zone
                 scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S").replace(
@@ -180,7 +180,7 @@ if conn:
                     continue
             time_diff = (scheduled_time - current_time).total_seconds()
             logging.info(f"Checking reminder ID {reminder[0]}, scheduled: {scheduled_time}, time_diff: {time_diff}")
-            if -300 <= time_diff <= 300:  # 1-minute window before/after
+            if -60 <= time_diff <= 60:  # 1-minute window before/after
                 user_id, email, reminder_type = reminder[1], reminder[2], reminder[3]
                 logging.info(f"Triggering email for {reminder_type}")
                 if send_reminder_email(user_id, email, reminder_type, scheduled_time):
