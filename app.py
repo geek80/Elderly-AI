@@ -153,7 +153,7 @@ def send_reminder_email(user_id, email, reminder_type, scheduled_time):
         return False
 
 # Global reminder check
-current_time = datetime.now(pytz.timezone('Etc/GMT+1'))  # Fixed UTC+1, no DST
+current_time = datetime.now(pytz.timezone('Etc/GMT+1'))  # Fixed UTC+1
 logging.info(f"Current time with timezone: {current_time} ({current_time.tzname()})")
 conn = get_connection()
 if conn:
