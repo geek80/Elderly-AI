@@ -208,15 +208,7 @@ with tab1:
     # Informational note (cron handles sending)
     st.write("Reminders are checked and sent via a scheduled job.")
 
-    # Debug reminder check (temporary, remove after testing)
-    2025-10-16 12:06:29,178 - Verified write access to /data/db/elderly_ai.db
-2025-10-16 12:06:29,186 - Tables created or verified.
-2025-10-16 12:06:29,283 - Found 18 unsent reminders at 2025-10-16 12:06:29.279924
-2025-10-16 12:06:29,284 - Reminder check failed: time data '23:45:00' does not match format '%Y-%m-%d %H:%M:%S'
-2025-10-16 12:06:46,248 - Verified write access to /data/db/elderly_ai.db
-2025-10-16 12:06:46,264 - Tables created or verified.
-2025-10-16 12:06:46,277 - Found 19 unsent reminders at 2025-10-16 12:06:46.277692
-2025-10-16 12:06:46,278 - Reminder check failed: time data '23:45:00' does not match format '%Y-%m-%d %H:%M:%S
+    
 
 # Health Summary Agent Form
 with tab2:
