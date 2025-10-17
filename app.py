@@ -162,7 +162,7 @@ if conn:
         reminders = cursor.fetchall()
         logging.info(f"Found {len(reminders)} unsent reminders at {current_time}")
         for reminder in reminders:
-            scheduled_time_str = reminder[4].replace('+00:53', '').strip()  # Remove +00:53 and trim
+            scheduled_time_str = reminder[4].replace('-01:00', '').replace('+00:53', '').strip()  # Remove invalid offsets
             try:
                 # Parse as naive datetime and apply UTC+1 time zone
                 scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S").replace(
