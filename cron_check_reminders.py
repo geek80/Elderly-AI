@@ -57,7 +57,19 @@ if __name__ == "__main__":
             logging.info(f"Checking {len(reminders)} unsent reminders at {current_time}")
             emails_sent = 0
             for reminder in reminders:
-                scheduled_time = datetime.strptime(reminder[4], "%Y-%m-%d %H:%M:%S")
+                scheduled_time_str = reminder[4]
+                try:
+                    # Try full datetime format first
+                    scheduled_time = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    try:
+                        # Fall back to time-only format, assume today
+                        scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M:%S").replace(
+                            year=current_time.year, month=current_time.month, day=current_time.day
+                        )
+                    except ValueError:
+                        logging.error(f"Invalid scheduled_time format for ID {reminder[0]}: {scheduled_time_str}")
+                        continue
                 time_diff = (scheduled_time - current_time).total_seconds()
                 logging.info(f"Reminder ID {reminder[0]}: scheduled {scheduled_time}, diff {time_diff}")
                 if -300 <= time_diff <= 300:  # 5-minute window
