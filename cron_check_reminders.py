@@ -11,13 +11,20 @@ from sendgrid.helpers.mail import Mail
 # Set up logging to stdout for Render Logs
 logging.basicConfig(level=logging.INFO)
 
-# Define database path
-db_path = "/data/db/elderly_ai.db" if os.getenv("RENDER") else os.path.join(os.getcwd(), "data/db/elderly_ai.db")
+# Full path to Python for Render cron
+PYTHON_PATH = "/opt/render/project/.venv/bin/python"
+
+# Define database path explicitly for Render
+db_path = "/data/db/elderly_ai.db"
 logging.info(f"Script started at {datetime.now()}. DB path: {db_path}")
 
 def get_connection():
     logging.info("Attempting DB connection")
-    return sqlite3.connect(db_path)
+    try:
+        return sqlite3.connect(db_path)
+    except sqlite3.OperationalError as e:
+        logging.error(f"DB connection failed: {str(e)}")
+        return None
 
 def send_reminder_email(user_id, email, reminder_type, scheduled_time):
     logging.info(f"Attempting to send to {email} for {reminder_type} (user_id: {user_id})")
